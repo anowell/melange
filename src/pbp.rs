@@ -1,7 +1,3 @@
-use anyhow::{anyhow, Result};
-use arrow::util::pretty::print_batches;
-use futures::TryStreamExt;
-use spiceai::ClientBuilder;
 use sql_query_builder as sql;
 
 pub struct PbpQuery {
@@ -10,17 +6,17 @@ pub struct PbpQuery {
     rushing: sql::Select,
 }
 
-// This would NOT be acceptable to avoid SQL injection (use parameterized queries)
-// but we're assuming the Spice API prevents any meaningful SQL injection
+// This would NOT be acceptable to avoid SQL injection
+// but we don't really have a DB driver to hand parameterized queries to.
+// I'm assuming the Spice API effectively disallows SQL injection (and writes in general)
 // so this just handles input parameters a bit more sanely
 fn safe_spice(input: &str) -> String {
-    // Step 1: Remove control characters
     let sanitized: String = input
         .chars()
         .filter(|c| !c.is_control())
         .map(|c| match c {
-            '\'' => "''".to_string(),   // Escape single quotes
-            '\\' => "\\\\".to_string(), // Escape backslashes
+            '\'' => "''".to_string(),
+            '\\' => "\\\\".to_string(),
             _ => c.to_string(),
         })
         .collect();
@@ -29,6 +25,7 @@ fn safe_spice(input: &str) -> String {
 }
 
 impl PbpQuery {
+    /// Query to collect all the the passing stats
     pub fn passing(year: u16) -> sql::Select {
         let query = sql::Select::new()
             .select(
@@ -51,6 +48,7 @@ impl PbpQuery {
         query
     }
 
+    /// Query to collect all the the receiving stats
     pub fn receiving(year: u16) -> sql::Select {
         let query = sql::Select::new()
             .select("
@@ -71,6 +69,7 @@ impl PbpQuery {
         query
     }
 
+    /// Query to collect all the the rushing stats
     pub fn rushing(year: u16) -> sql::Select {
         let query = sql::Select::new()
             .select("
@@ -153,12 +152,12 @@ impl PbpQuery {
         self.where_and_each(&clause)
     }
 
+    /// Joins queries for passing, rushing, and receiving stats on a per-user, per-game basis
     pub fn sql(self) -> String {
         let join = sql::Select::new()
             .with("passing", self.passing)
             .with("receiving", self.receiving)
             .with("rushing", self.rushing)
-            // .select("*")
             .select(
                 "
                 COALESCE(p.game_id, rx.game_id, r.game_id) AS game_id,
@@ -182,6 +181,7 @@ impl PbpQuery {
             ",
             )
             .from("passing p")
+            // Raw because this query builder doesn't have a helper for FULL/OUTER JOIN 
             .raw_after(
                 sql::SelectClause::From,
                 "FULL JOIN receiving rx USING (player_id, game_id)",
