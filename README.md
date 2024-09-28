@@ -3,10 +3,7 @@
 Melange is an experiment in using [spice.ai](https://spice.ai) to explore NFL data in the aim of developing Fantasy Football strategy.
 
 > _The spice must flow._
->                 -Dune
-
-`Fantasy + Spice = Melange`
-
+>                 _-Dune_
 
 ## Status
 
@@ -23,10 +20,10 @@ Install spice (CLI or Docker container), then start spice.
 
 ```bash
 # Local CLI
-cd spiceai && spice run
+spice run
 
 # Or Docker (in theory?)
-docker run --rm -it -p 8090:8090 -v $(pwd)/spiceai:/app spiceai/spiceai
+docker run --rm -it -p 8090:8090 -v $(pwd)/spicepod.yaml:/app/spicepod.yaml spiceai/spiceai
 ```
 
 

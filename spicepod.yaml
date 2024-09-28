@@ -1,6 +1,6 @@
 version: v1beta1
 kind: Spicepod
-name: pbp
+name: spice_qs
 datasets:
 - from: https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2024.parquet
   name: pbp2024
@@ -29,3 +29,10 @@ datasets:
     enabled: true
     refresh_check_interval: 30d
     refresh_mode: full
+models:
+- from: openai:gpt-4o-mini
+  name: openai-with-spice
+  params:
+    spice_tools: auto
+    openai_api_key: ${ env:SPICE_OPENAI_API_KEY }
+    system_prompt: You are a data analyst processing NFL data.
