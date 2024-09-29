@@ -1,0 +1,12 @@
+/* Import the Google Font */
+@import url('https://fonts.googleapis.com/css?family=Nunito:400,700');
+
+/*
+DaisyUi for convenience, Tailwind for flexibility
+- https://daisyui.com/docs
+- https://tailwindcss.com/docs
+*/
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -1,27 +1,14 @@
 use sql_query_builder as sql;
 
+use crate::{rosters::RosterQuery, safe_spice};
+
 pub struct PbpQuery {
     passing: sql::Select,
     receiving: sql::Select,
     rushing: sql::Select,
-}
-
-// This would NOT be acceptable to avoid SQL injection
-// but we don't really have a DB driver to hand parameterized queries to.
-// I'm assuming the Spice API effectively disallows SQL injection (and writes in general)
-// so this just handles input parameters a bit more sanely
-fn safe_spice(input: &str) -> String {
-    let sanitized: String = input
-        .chars()
-        .filter(|c| !c.is_control())
-        .map(|c| match c {
-            '\'' => "''".to_string(),
-            '\\' => "\\\\".to_string(),
-            _ => c.to_string(),
-        })
-        .collect();
-
-    sanitized
+    roster: RosterQuery,
+    limit: u16,
+    join_roster: bool,
 }
 
 impl PbpQuery {
@@ -32,6 +19,7 @@ impl PbpQuery {
                 "
                 game_id,
                 MIN(game_date) as game_date,
+                MIN(week) as week,
                 posteam as team,
                 passer_player_id as player_id,
                 passer_player_name as player_name,
@@ -54,6 +42,7 @@ impl PbpQuery {
             .select("
                 game_id,
                 MIN(game_date) as game_date,
+                MIN(week) as week,
                 posteam as team,
                 receiver_player_id as player_id,
                 receiver_player_name as player_name,
@@ -75,6 +64,7 @@ impl PbpQuery {
             .select("
                 game_id,
                 MIN(game_date) as game_date,
+                MIN(week) as week,
                 posteam as team,
                 rusher_player_id as player_id,
                 rusher_player_name as player_name,
@@ -93,40 +83,81 @@ impl PbpQuery {
         let passing = Self::passing(year);
         let receiving = Self::receiving(year);
         let rushing = Self::rushing(year);
+        let roster = RosterQuery::new(year);
         Self {
             passing,
             receiving,
             rushing,
+            roster,
+            limit: 500,
+            join_roster: false,
         }
     }
 
-    pub fn filter_player(self, player_name: &str) -> Self {
-        self.filter_passer(player_name)
-            .filter_rusher(player_name)
-            .filter_receiver(player_name)
+    pub fn filter_player(mut self, player_name: &str) -> Self {
+        self.roster = self.roster.name_search(player_name);
+        self.join_roster = true;
+        self
+
+        // self.filter_passer(player_name)
+        //     .filter_rusher(player_name)
+        //     .filter_receiver(player_name)
     }
 
-    pub fn filter_passer(mut self, player_name: &str) -> Self {
-        self.passing = self.passing.where_and(&format!(
-            "passer_player_name = '{}'",
-            safe_spice(player_name)
-        ));
+    // pub fn filter_passer(mut self, player_name: &str) -> Self {
+    //     self.passing = self.passing.where_and(&format!(
+    //         "passer_player_name = '{}'",
+    //         safe_spice(player_name)
+    //     ));
+    //     self
+    // }
+
+    // pub fn filter_rusher(mut self, player_name: &str) -> Self {
+    //     self.rushing = self.rushing.where_and(&format!(
+    //         "receiver_player_name = '{}'",
+    //         safe_spice(player_name)
+    //     ));
+    //     self
+    // }
+
+    // pub fn filter_receiver(mut self, player_name: &str) -> Self {
+    //     self.receiving = self.receiving.where_and(&format!(
+    //         "rusher_player_name = '{}'",
+    //         safe_spice(player_name)
+    //     ));
+    //     self
+    // }
+
+    pub fn filter_player_id(self, player_id: &str) -> Self {
+        self.filter_passer_id(player_id)
+            .filter_rusher_id(player_id)
+            .filter_receiver_id(player_id)
+    }
+
+    pub fn filter_passer_id(mut self, player_id: &str) -> Self {
+        self.passing = self
+            .passing
+            .where_and(&format!("passer_player_id = '{}'", safe_spice(player_id)));
         self
     }
 
-    pub fn filter_rusher(mut self, player_name: &str) -> Self {
-        self.rushing = self.rushing.where_and(&format!(
-            "receiver_player_name = '{}'",
-            safe_spice(player_name)
-        ));
+    pub fn filter_rusher_id(mut self, player_id: &str) -> Self {
+        self.rushing = self
+            .rushing
+            .where_and(&format!("receiver_player_id = '{}'", safe_spice(player_id)));
         self
     }
 
-    pub fn filter_receiver(mut self, player_name: &str) -> Self {
-        self.receiving = self.receiving.where_and(&format!(
-            "rusher_player_name = '{}'",
-            safe_spice(player_name)
-        ));
+    pub fn filter_receiver_id(mut self, player_id: &str) -> Self {
+        self.receiving = self
+            .receiving
+            .where_and(&format!("rusher_player_id = '{}'", safe_spice(player_id)));
+        self
+    }
+
+    pub fn filter_position(mut self, position: &str) -> Self {
+        self.roster = self.roster.position(position);
+        self.join_roster = true;
         self
     }
 
@@ -137,34 +168,47 @@ impl PbpQuery {
         self
     }
 
-    pub fn filter_week(self, week: u16) -> Self {
+    pub fn filter_week(mut self, week: u16) -> Self {
+        self.roster = self.roster.single_week(Some(week));
         let clause = format!("week = {week}");
         self.where_and_each(&clause)
     }
 
-    pub fn filter_week_range(self, start: u16, end: u16) -> Self {
+    pub fn filter_week_range(mut self, start: u16, end: u16) -> Self {
+        self.roster = self.roster.week_range(start, end);
         let clause = format!("week BETWEEN {start} AND {end}");
         self.where_and_each(&clause)
     }
 
-    pub fn filter_team(self, team: &str) -> Self {
+    pub fn filter_team(mut self, team: &str) -> Self {
+        self.roster = self.roster.team(team);
         let clause = format!("posteam = '{}'", safe_spice(team));
         self.where_and_each(&clause)
     }
 
+    pub fn join_roster(mut self) -> Self {
+        self.join_roster = true;
+        self
+    }
+
+    pub fn limit(mut self, limit: u16) -> Self {
+        self.limit = limit;
+        self
+    }
+
     /// Joins queries for passing, rushing, and receiving stats on a per-user, per-game basis
     pub fn sql(self) -> String {
-        let join = sql::Select::new()
-            .with("passing", self.passing)
-            .with("receiving", self.receiving)
-            .with("rushing", self.rushing)
+        let coalesce = |field| format!("COALESCE(p.{0}, rx.{0}, r.{0}) AS {0}", field);
+
+        let pbp_join = sql::Select::new()
+            .select(&coalesce("game_id"))
+            .select(&coalesce("game_date"))
+            .select(&coalesce("week"))
+            .select(&coalesce("team"))
+            .select(&coalesce("player_id"))
+            .select(&coalesce("player_name"))
             .select(
                 "
-                COALESCE(p.game_id, rx.game_id, r.game_id) AS game_id,
-                COALESCE(p.game_date, rx.game_date, r.game_date) AS game_date,
-                COALESCE(p.team, rx.team, r.team) AS team,
-                COALESCE(p.player_id, rx.player_id, r.player_id) AS player_id,
-                COALESCE(p.player_name, rx.player_name, r.player_name) AS player_name,
                 p.passing_yards,
                 p.pass_touchdowns,
                 p.interceptions,
@@ -181,7 +225,7 @@ impl PbpQuery {
             ",
             )
             .from("passing p")
-            // Raw because this query builder doesn't have a helper for FULL/OUTER JOIN 
+            // Raw because this query builder doesn't have a helper for FULL/OUTER JOIN
             .raw_after(
                 sql::SelectClause::From,
                 "FULL JOIN receiving rx USING (player_id, game_id)",
@@ -189,10 +233,30 @@ impl PbpQuery {
             .raw_after(
                 sql::SelectClause::From,
                 "FULL JOIN rushing r USING (player_id, game_id)",
-            )
-            .order_by("game_date, passing_yards DESC NULLS LAST, receiving_yards DESC NULLS LAST, rushing_yards DESC NULLS LAST")
-            .limit("100");
-        join.as_string()
+            );
+
+        let mut join = sql::Select::new()
+            .with("passing", self.passing)
+            .with("receiving", self.receiving)
+            .with("rushing", self.rushing)
+            .with("pbpjoin", pbp_join)
+            .select("*")
+            .from("pbpjoin")
+            .order_by("game_date, passing_yards DESC NULLS LAST, receiving_yards DESC NULLS LAST, rushing_yards DESC NULLS LAST");
+
+        if self.join_roster {
+            join = join
+                .with("rosters", self.roster.query())
+                // Calculating age was harder than expected
+                // Using cast to Int64 (seconds): https://github.com/apache/arrow-rs/blob/0a4d8a14b58e45ef92e31541f0b51a5b25de5f10/arrow-cast/src/cast/mod.rs#L275
+                // After v43, consider `extract(days from duration) / 365.25`: https://github.com/apache/datafusion/pull/12514
+                .select("ROUND(arrow_cast(pbpjoin.game_date::DATE - rosters.birth_date::DATE, 'Int64') / (60*60*24*365.25), 1) AS age")
+                .inner_join(
+                    "rosters ON pbpjoin.player_id = rosters.id AND pbpjoin.week = rosters.week",
+                );
+        }
+
+        join.limit(&self.limit.to_string()).as_string()
     }
 }
 

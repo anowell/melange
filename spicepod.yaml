@@ -20,9 +20,18 @@ datasets:
     enabled: true
     refresh_check_interval: 30d
     refresh_mode: full
-- from: https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2022.parquet
-  name: pbp2022
-  description: NFL Play-by-play 2022
+- from: https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2024.parquet
+  name: roster2024
+  description: NFL 2024 Weekly Rosters
+  params:
+    file_format: parquet
+  acceleration:
+    enabled: true
+    refresh_check_interval: 12h
+    refresh_mode: full
+- from: https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_2023.parquet
+  name: roster2023
+  description: NFL 2023 Weekly Rosters
   params:
     file_format: parquet
   acceleration:

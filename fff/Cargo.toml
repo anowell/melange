@@ -1,0 +1,13 @@
+[package]
+name = "fff"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# tokio = { version = "1.40.0", features = ["full"] }
+futures = "0.3.30"
+spiceai = "2.0.0"
+# arrow version needs to match spiceai dep
+arrow = { version = "51.0.0", features = ["prettyprint"] }
+sql_query_builder = { version = "2.3.0", features = ["postgresql"] }
+itertools = "0.13.0"

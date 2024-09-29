@@ -1,0 +1,20 @@
+[package]
+name = "melange"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.40.0", features = ["full"] }
+anyhow = "1.0.89"
+clap = { version = "4.5.18", features = ["derive"] }
+futures = "0.3.30"
+fff = { path = "../fff" }
+
+spiceai.workspace = true
+arrow = { workspace = true, features = ["prettyprint"] }
+# spiceai = "2.0.0"
+# arrow version needs to match spiceai dep
+# arrow = { version = "51.0.0", features = ["prettyprint"] }
+# sea-query = { version = "0.31.0", features = ["derive"] }
+sql_query_builder = { version = "2.3.0", features = ["postgresql"] }
+itertools = "0.13.0"
