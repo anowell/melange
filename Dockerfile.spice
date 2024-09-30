@@ -1,2 +1,3 @@
 FROM spiceai/spiceai:latest-models
 ADD spicepod.yaml /app
+CMD ["--http", "0.0.0.0:8090", "--flight", "0.0.0.0:50051", "--open_telemetry", "0.0.0.0:50052"]

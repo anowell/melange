@@ -5,11 +5,11 @@
     }
 
     handle /health {
-        reverse_proxy localhost:8888
+        reverse_proxy melange-api:8888
     }
 
     handle /v1* {
-        reverse_proxy localhost:8888
+        reverse_proxy melange-api:8888
     }
 
     handle {
