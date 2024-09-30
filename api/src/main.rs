@@ -40,13 +40,16 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::from_env()?;
     let port = config.port;
-    tracing::trace!("Initialize Spice client: {}", config.spice_api.as_str());
+    tracing::trace!(
+        "Initialize Spice client: {}",
+        config.spice_flight_url.as_str()
+    );
     let spice = ClientBuilder::new()
-        .flight_url(config.spice_api.as_str())
+        .flight_url(config.spice_flight_url.as_str())
         .build()
         .await
         .unwrap();
-    let openai = OpenAiClient::with_base_url(config.spice_api.as_str());
+    let openai = OpenAiClient::with_base_url(config.spice_http_url.join("v1").unwrap().as_str());
 
     let ctx = Ctx {
         config: Arc::new(config),

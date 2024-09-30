@@ -33,6 +33,10 @@ impl OpenAiClient {
         OpenAiClient { client }
     }
 
+    pub fn inner(&self) -> &Client<OpenAIConfig> {
+        &self.client
+    }
+
     pub async fn get_chat_response(
         &self,
         model: &str,

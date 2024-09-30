@@ -16,6 +16,7 @@ pub struct Config {
 
     pub allow_origin: Option<Url>,
 
-    /// Spice API for querying data and models
-    pub spice_api: Url,
+    /// Spice URLs for querying data and models
+    pub spice_http_url: Url,
+    pub spice_flight_url: Url,
 }

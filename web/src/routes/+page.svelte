@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getStats, type TableData } from '$lib/api';
+	import ChatDrawer from '$lib/components/ChatDrawer.svelte';
 	import PlayerAutocomplete from '$lib/components/PlayerAutocomplete.svelte';
 	import TeamAutocomplete from '$lib/components/TeamAutocomplete.svelte';
 	import DataTable from '$lib/system/DataTable.svelte';
@@ -83,18 +84,27 @@
 			/>
 		</label>
 
-		<div class="col-span-full">
-			<button class="btn btn-primary w-full" onclick={queryStats}>Query Stats</button>
-		</div>
+		<label class="form-control">
+			<div class="label">
+				<span class="label-text">&nbsp;</span>
+			</div>
+			<button class="btn btn-primary btn-sm" onclick={queryStats}>Query Stats</button>
+		</label>
 	</div>
+
+	<div class="divider"></div>
 
 	{#if isLoading}
 		<div class="flex justify-center mt-2">
 			<span class="loading loading-spinner loading-md"></span>
 		</div>
 	{:else if data && data.length > 0}
-		<DataTable {data} />
+		<div class="w-full overflow-x-auto">
+			<DataTable {data} />
+		</div>
 	{:else if data && data.length === 0}
 		<p class="mt-2 text-sm text-error">No results found</p>
 	{/if}
 </div>
+
+<ChatDrawer />

@@ -14,7 +14,9 @@ pub struct PbpQuery {
 impl PbpQuery {
     /// Query to collect all the the passing stats
     pub fn passing(year: u16) -> sql::Select {
-        let query = sql::Select::new()
+        
+
+        sql::Select::new()
             .select(
                 "
                 game_id,
@@ -31,14 +33,13 @@ impl PbpQuery {
             )
             .from(&format!("pbp{}", year))
             .where_clause("passer_player_name IS NOT NULL")
-            .group_by("game_id, posteam, passer_player_id, passer_player_name");
-
-        query
+            .group_by("game_id, posteam, passer_player_id, passer_player_name")
     }
 
     /// Query to collect all the the receiving stats
     pub fn receiving(year: u16) -> sql::Select {
-        let query = sql::Select::new()
+        
+        sql::Select::new()
             .select("
                 game_id,
                 MIN(game_date) as game_date,
@@ -54,13 +55,13 @@ impl PbpQuery {
             ")
             .from(&format!("pbp{}", year))
             .where_clause("receiver_player_name IS NOT NULL")
-            .group_by("game_id, posteam, receiver_player_id, receiver_player_name");
-        query
+            .group_by("game_id, posteam, receiver_player_id, receiver_player_name")
     }
 
     /// Query to collect all the the rushing stats
     pub fn rushing(year: u16) -> sql::Select {
-        let query = sql::Select::new()
+        
+        sql::Select::new()
             .select("
                 game_id,
                 MIN(game_date) as game_date,
@@ -75,8 +76,7 @@ impl PbpQuery {
             ")
             .from(&format!("pbp{}", year))
             .where_clause("rusher_player_name IS NOT NULL")
-            .group_by("game_id, posteam, rusher_player_id, rusher_player_name");
-        query
+            .group_by("game_id, posteam, rusher_player_id, rusher_player_name")
     }
 
     pub fn year(year: u16) -> Self {
@@ -162,9 +162,9 @@ impl PbpQuery {
     }
 
     fn where_and_each(mut self, clause: &str) -> Self {
-        self.passing = self.passing.where_and(&clause);
-        self.receiving = self.receiving.where_and(&clause);
-        self.rushing = self.rushing.where_and(&clause);
+        self.passing = self.passing.where_and(clause);
+        self.receiving = self.receiving.where_and(clause);
+        self.rushing = self.rushing.where_and(clause);
         self
     }
 

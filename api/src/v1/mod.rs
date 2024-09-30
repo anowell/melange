@@ -1,18 +1,23 @@
 use crate::{serde_utils, Ctx, Result};
 use anyhow::{anyhow, Context};
 use arrow::{array::RecordBatch, json::ArrayWriter};
+use async_openai::error::OpenAIError;
+use async_openai::types::{ChatCompletionResponseStream, CreateChatCompletionRequest};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 use fff::{pbp::PbpQuery, rosters::RosterQuery};
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use std::time::Duration;
 use tokio::sync::Mutex;
+use tracing::{Instrument, Span};
 
 type JsonRecords = Vec<Map<String, Value>>;
 
@@ -20,7 +25,7 @@ pub(crate) fn router() -> Router<Ctx> {
     Router::new()
         .route("/v1/stats", get(get_stats))
         .route("/v1/players", get(search_players))
-        .route("/v1/chat", post(post_chat))
+        .route("/v1/chat/completions", post(stream_chat))
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -54,7 +59,7 @@ impl SearchPlayersParams {
         let year = self.year.unwrap_or(2024);
         let query = RosterQuery::new(year)
             .name_search(&self.search)
-            .single_week(self.week.clone());
+            .single_week(self.week);
         query.sql()
     }
 }
@@ -85,15 +90,15 @@ impl GetStatsParams {
         let mut query_builder = PbpQuery::year(self.year.unwrap_or(2024)).join_roster();
 
         if let Some(player_name) = &self.player {
-            query_builder = query_builder.filter_player(&player_name);
+            query_builder = query_builder.filter_player(player_name);
         }
 
         if let Some(team) = &self.team {
-            query_builder = query_builder.filter_team(&team);
+            query_builder = query_builder.filter_team(team);
         }
 
         if let Some(position) = &self.position {
-            query_builder = query_builder.filter_position(&position);
+            query_builder = query_builder.filter_position(position);
         }
 
         match self.weeks {
@@ -106,8 +111,8 @@ impl GetStatsParams {
             None => {}
         }
 
-        let query = query_builder.sql();
-        query
+        
+        query_builder.sql()
     }
 }
 
@@ -124,7 +129,7 @@ async fn query_spice(spice: &Mutex<spiceai::Client>, query: &str) -> Result<Json
 
     let mut spice = spice.lock().await;
     let flight = spice
-        .query(&query)
+        .query(query)
         .await
         .map_err(|err| anyhow!("Query error: {}", err))?;
 
@@ -139,8 +144,58 @@ async fn query_spice(spice: &Mutex<spiceai::Client>, query: &str) -> Result<Json
     Ok(json_resp)
 }
 
-async fn post_chat() -> StatusCode {
-    StatusCode::INTERNAL_SERVER_ERROR
+async fn stream_chat(
+    State(ctx): State<Ctx>,
+    Json(data): Json<CreateChatCompletionRequest>,
+) -> Response {
+    let span = tracing::span!(target: "task_history", tracing::Level::INFO, "ai_chat", input = %serde_json::to_string(&data).unwrap_or_default());
+
+    // Create an async stream for SSE
+    let client = &ctx.openai.inner();
+    tracing::trace!("Starting openai chat");
+    let response = client.chat().create_stream(data).await.unwrap();
+    tracing::trace!("Chat started");
+
+    create_sse_response(response, Duration::from_secs(30), span)
+}
+
+fn create_sse_response(
+    mut strm: ChatCompletionResponseStream,
+    keep_alive_interval: Duration,
+    span: Span,
+) -> Response {
+    Sse::new(Box::pin(async_stream::stream! {
+        let mut chat_output = String::new();
+        while let Some(msg) = strm.next().instrument(span.clone()).await {
+            match msg {
+                Ok(resp) => {
+                    if let Some(choice) = resp.choices.first() {
+                        if let Some(intermediate_chat_output) = &choice.delta.content {
+                            chat_output.push_str(intermediate_chat_output);
+                        }
+                    }
+                    let y = Event::default();
+                    match y.json_data(resp).map_err(axum::Error::new) {
+                        Ok(a) => yield Ok(a),
+                        Err(e) => yield Err(e),
+                    }
+                },
+                // TODO: Is this openai or spice ending streams with this error?
+                Err(OpenAIError::StreamError(e)) if e == "Stream ended" => {
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!("chat stream err: {:?}", e);
+                    yield Err(axum::Error::new(e.to_string()));
+                    break;
+                }
+            }
+        };
+        tracing::info!(target: "task_history", parent: &span, captured_output = %chat_output);
+        drop(span);
+    }))
+    .keep_alive(KeepAlive::new().interval(keep_alive_interval))
+    .into_response()
 }
 
 fn record_batches_to_json(record_batches: Vec<RecordBatch>, max_records: usize) -> JsonRecords {

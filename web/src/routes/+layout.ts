@@ -1,4 +1,6 @@
 import '../app.css';
-// import 'remixicon/fonts/remixicon.css';
+import 'openai/shims/web';
+
+import 'remixicon/fonts/remixicon.css';
 
 export const ssr = false;
