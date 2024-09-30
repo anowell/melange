@@ -1,0 +1,2 @@
+FROM spiceai/spiceai:latest-models
+ADD spicepod.yaml /app

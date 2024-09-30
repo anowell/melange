@@ -1,0 +1,27 @@
+services:
+  spice:
+    image: melange-spice:latest
+    network_mode: host
+    env_file:
+      - ./.env
+
+  api:
+    image: melange-api:latest
+    depends_on:
+      spice:
+        condition: service_started
+    network_mode: host
+    env_file:
+      - ./.env
+
+  web:
+    image: melange-web:latest
+    volumes:
+      - ./web/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_melange:/data
+    network_mode: host
+    env_file:
+      - ./.env
+
+volumes:
+  caddy_melange:

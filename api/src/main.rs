@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         .flight_url(config.spice_flight_url.as_str())
         .build()
         .await
-        .unwrap();
+        .expect("spice client initialized");
     let openai = OpenAiClient::with_base_url(config.spice_http_url.join("v1").unwrap().as_str());
 
     let ctx = Ctx {

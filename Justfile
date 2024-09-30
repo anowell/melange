@@ -11,3 +11,14 @@ _run:
 
 webdev:
     cd web && pnpm dev
+
+
+docker-api:
+   docker build --tag melange-api .
+
+docker-web:
+   docker build --tag melange-web web
+
+docker-spice:
+   docker build -f Dockerfile.spice --tag melange-spice .
+
