@@ -49,8 +49,13 @@
 			scrollContainer.scrollTop = scrollableHeight;
 		}
 	});
+
+	function handleWindowResize() {
+		width = Math.min(Math.max(width, 600), window.innerWidth);
+	}
 </script>
 
+<svelte:window onresize={handleWindowResize} />
 <div
 	class="fixed inset-y-0 right-0 flex flex-col bg-base-100 shadow-lg z-50 transition-transform duration-300"
 	bind:this={drawerRef}
